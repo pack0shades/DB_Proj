@@ -1,0 +1,2 @@
+logical_reads,logical_writes,physical_reads,physical_writes,buffer_hits,buffer_misses
+2000,0,1621,0,379,1621
