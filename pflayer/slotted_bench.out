@@ -1,0 +1,6 @@
+Inserted 10000
+Slotted: records=17814 pages=693 bytes=715933877 util=252.2201
+Static(size=64): pages=279 util=0.9976
+Static(size=128): pages=557 util=0.9994
+Static(size=256): pages=1114 util=0.9994
+Static(size=512): pages=2227 util=0.9999

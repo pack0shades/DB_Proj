@@ -59,6 +59,12 @@ extern int PF_GetReplPolicy(int fd);
 extern int PF_SetBufferPoolSize(int n);
 extern int PF_MarkDirty(int fd, int pagenum);
 
+/* Global default replacement policy (applies to subsequently opened files) */
+extern int PF_SetDefaultReplPolicy(int policy);
+
+/* Convenience open: choose policy and optionally resize buffer pool (per-process) */
+extern int PF_OpenFileEx(char *fname, int repl_policy, int bufpool_size);
+
 /* Stats APIs */
 extern void PF_StatsReset();
 extern void PF_StatsGet(PFStats *out);

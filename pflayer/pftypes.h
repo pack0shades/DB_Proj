@@ -46,7 +46,7 @@ typedef struct PFbpage {
 					buffer page */
 	struct PFbpage *prevpage;	/* previous in the linked list
 					of buffer pages */
-	short	dirty:1,		/* TRUE if page is dirty */
+	unsigned short dirty:1,		/* TRUE if page is dirty */
 		fixed:1;		/* TRUE if page is fixed in buffer*/
 	int	page;			/* page number of this page */
 	int	fd;			/* file desciptor of this page */
@@ -73,12 +73,12 @@ typedef struct PFhash_entry {
 /******************* Interface functions from Hash Table ****************/
 extern void PFhashInit();
 extern PFbpage *PFhashFind();
-extern PFhashInsert();
-extern PFhashDelete();
-extern PFhashPrint();
+extern int PFhashInsert();
+extern int PFhashDelete();
+extern void PFhashPrint();
 
 /****************** Interface functions from Buffer Manager *************/
-extern PFbufGet();
-extern PFbufUnfix();
-extern PFbufalloc();
-extern PFbufReleaseFile();
+extern int PFbufGet();
+extern int PFbufUnfix();
+extern int PFbufAlloc();
+extern int PFbufReleaseFile();

@@ -21,6 +21,9 @@ int PF_max_bufs = PF_MAX_BUFS;
 /* global stats */
 static PFStats PFstats = {0, 0, 0, 0, 0, 0};
 
+/* Default replacement policy for newly opened files */
+static int PF_default_repl_policy = PF_REPL_LRU;
+
 /* Stats helper functions for buffer manager */
 void PF_StatsBufferHit() { PFstats.buffer_hits++; }
 void PF_StatsBufferMiss() { PFstats.buffer_misses++; }
@@ -202,7 +205,7 @@ char *env;
 	/* init the file table to be not used*/
 	for (i=0; i < PF_FTAB_SIZE; i++){
 		PFftab[i].fname = NULL;
-		PFftab[i].repl_policy = PF_REPL_LRU;
+		PFftab[i].repl_policy = PF_default_repl_policy;
 	}
 
 	/* env-based buffer size override */
@@ -356,8 +359,29 @@ int fd; /* file descriptor */
 		return(PFerrno);
 	}
 
-	PFftab[fd].repl_policy = PF_REPL_LRU; /* default */
+	/* apply current default policy */
+	PFftab[fd].repl_policy = PF_default_repl_policy;
 	return(fd);
+}
+
+/* New: Open with options (replacement policy and optional buffer pool size). */
+int PF_OpenFileEx(char *fname, int repl_policy, int bufpool_size)
+{
+    int fd = PF_OpenFile(fname);
+    if (fd < 0)
+        return fd;
+
+    /* Apply replacement policy if valid, else leave default. */
+    if (repl_policy == PF_REPL_LRU || repl_policy == PF_REPL_MRU) {
+        PFftab[fd].repl_policy = (short)repl_policy;
+    }
+
+    /* Optionally adjust buffer pool size process-wide if requested. */
+    if (bufpool_size > 0 && bufpool_size <= PF_MAX_BUFS) {
+        PF_SetBufferPoolSize(bufpool_size);
+    }
+
+    return fd;
 }
 
 PF_CloseFile(fd)
@@ -448,8 +472,7 @@ RETURN VALUE:
 	*pagenum = -1; 
 	{ 
 		int rc = PF_GetNextPage(fd, pagenum, pagebuf); 
-		if (rc == PFE_OK) 
-			PFstats.logical_reads++; 
+		/* Do not increment stats here; PF_GetNextPage already does it on success */
 		return rc; 
 	}
 }
@@ -642,8 +665,8 @@ int error;
 	/* set return value */
 	*pagebuf = fpage->pagebuf;
 
-	if (error == PFE_OK)
-		PFstats.logical_writes++;
+	/* logical write for a successful allocation */
+	PFstats.logical_writes++;
 	
 	return(PFE_OK);
 }
@@ -696,10 +719,10 @@ int error;
 	PFftab[fd].hdr.firstfree = pagenum;
 	PFftab[fd].hdrchanged = TRUE;
 
-	/* unfix this page */
-	if (PFerrno == PFE_OK)
-		PFstats.logical_writes++;
+	/* logical write for dispose */
+	PFstats.logical_writes++;
 
+	/* unfix this page */
 	return(PFbufUnfix(fd,pagenum,TRUE));
 }
 
@@ -732,10 +755,9 @@ RETURN VALUE:
 		return(PFerrno);
 	}
 
-	if (PFerrno == PFE_OK && dirty)
+	/* Count logical op: write only if marked dirty */
+	if (dirty)
 		PFstats.logical_writes++;
-	else if (PFerrno == PFE_OK)
-		PFstats.logical_reads++;
 
 	return(PFbufUnfix(fd,pagenum,dirty));
 }
@@ -771,7 +793,7 @@ int PF_MarkDirty(int fd, int pagenum) {
 		return PFerrno;
 	}
 	b->dirty = TRUE;
-	PFstats.logical_writes++;
+	/* Do not bump logical_writes here; it's accounted on Unfix/Alloc/Dispose */
 	return PFE_OK;
 }
 
@@ -791,6 +813,13 @@ int PF_StatsWrite(const char *filepath) {
 	fprintf(f, "logical_reads,logical_writes,physical_reads,physical_writes,buffer_hits,buffer_misses\n");
 	fprintf(f, "%ld,%ld,%ld,%ld,%ld,%ld\n", PFstats.logical_reads, PFstats.logical_writes, PFstats.physical_reads, PFstats.physical_writes, PFstats.buffer_hits, PFstats.buffer_misses);
 	fclose(f);
+	return PFE_OK;
+}
+
+int PF_SetDefaultReplPolicy(int policy) {
+	if (policy != PF_REPL_LRU && policy != PF_REPL_MRU)
+		return (PFerrno = PFE_FD);
+	PF_default_repl_policy = policy;
 	return PFE_OK;
 }
 
